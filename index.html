@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Колесо фортуны</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+body{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;font-family:system-ui,sans-serif;background:var(--tg-theme-bg-color,#17212b);color:var(--tg-theme-text-color,#fff)}
+.w{position:relative}
+.w:after{content:"";position:absolute;top:-8px;left:50%;margin-left:-12px;border:12px solid transparent;border-top:22px solid #e63946}
+button{padding:14px 40px;font-size:18px;border:0;border-radius:12px;background:var(--tg-theme-button-color,#2ea6ff);color:var(--tg-theme-button-text-color,#fff)}
+button:disabled{opacity:.5}
+#r{font-size:20px;font-weight:700;text-align:center;min-height:56px;padding:0 16px}
+</style></head><body>
+<div class="w"><canvas id="c"></canvas></div>
+<div id="r"></div>
+<button id="b">Крутить</button>
+<script>
+const tg=window.Telegram&&Telegram.WebApp;if(tg){tg.ready();tg.expand()}
+const q=new URLSearchParams(location.search);
+const L=(q.get("labels")||"Приз 1|Приз 2|Приз 3|Приз 4").split("|");
+const win=Math.min(Math.max(+q.get("win")||0,0),L.length-1);
+const res=q.get("res")||L[win],id="spin_"+(q.get("id")||"test");
+const n=L.length,TAU=2*Math.PI,seg=TAU/n;
+const cv=document.getElementById("c"),S=Math.min(innerWidth-32,340),d=devicePixelRatio||1;
+cv.width=cv.height=S*d;cv.style.width=cv.style.height=S+"px";
+const x=cv.getContext("2d");x.scale(d,d);
+const COL=["#e76f51","#f4a261","#2a9d8f","#457b9d","#8e6bbf","#e9c46a"];
+let rot=0;
+function draw(){
+  const R=S/2;x.clearRect(0,0,S,S);
+  for(let i=0;i<n;i++){
+    const a=rot+i*seg;
+    x.beginPath();x.moveTo(R,R);x.arc(R,R,R-4,a,a+seg);x.fillStyle=COL[i%COL.length];x.fill();
+    x.save();x.translate(R,R);x.rotate(a+seg/2);x.fillStyle="#fff";x.textAlign="right";
+    let f=16;do{x.font="bold "+f+"px sans-serif";f--}while(x.measureText(L[i]).width>R*.62&&f>9);
+    x.fillText(L[i],R-16,5);x.restore();
+  }
+  x.beginPath();x.arc(R,R,18,0,TAU);x.fillStyle="#fff";x.fill();
+}
+const b=document.getElementById("b"),r=document.getElementById("r");
+function done(){
+  r.textContent="Вы выиграли: "+res;b.textContent="Закрыть";b.disabled=false;
+  b.onclick=()=>tg?tg.close():window.close();
+  try{localStorage.setItem(id,"1")}catch(e){}
+  if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred("success");
+}
+function spin(){
+  b.disabled=true;
+  const c=(win+.5+(Math.random()-.5)*.7)*seg;
+  const base=(((-Math.PI/2-c-rot)%TAU)+TAU)%TAU;
+  const from=rot,to=rot+6*TAU+base,t0=performance.now(),T=5000;
+  (function f(t){
+    const p=Math.min((t-t0)/T,1);
+    rot=from+(to-from)*(1-Math.pow(1-p,4));draw();
+    p<1?requestAnimationFrame(f):done();
+  })(t0);
+}
+draw();
+let seen=false;try{seen=localStorage.getItem(id)}catch(e){}
+if(seen)done();else b.onclick=spin;
+</script></body></html>
