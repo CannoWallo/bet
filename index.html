@@ -1,61 +1,139 @@
 <!doctype html>
 <html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Колесо фортуны</title>
+<title>Бонусы</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
-body{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;font-family:system-ui,sans-serif;background:var(--tg-theme-bg-color,#17212b);color:var(--tg-theme-text-color,#fff)}
-.w{position:relative}
-.w:after{content:"";position:absolute;top:-8px;left:50%;margin-left:-12px;border:12px solid transparent;border-top:22px solid #e63946}
-button{padding:14px 40px;font-size:18px;border:0;border-radius:12px;background:var(--tg-theme-button-color,#2ea6ff);color:var(--tg-theme-button-text-color,#fff)}
-button:disabled{opacity:.5}
-#r{font-size:20px;font-weight:700;text-align:center;min-height:56px;padding:0 16px}
+:root{--g:rgba(255,255,255,.07);--b:rgba(255,255,255,.13)}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;font-family:system-ui,-apple-system,sans-serif;color:#fff;background:radial-gradient(circle at 20% 0%,#3b2a7a 0,transparent 55%),radial-gradient(circle at 90% 100%,#0f4c75 0,transparent 55%),#120d29;padding:16px 16px 40px}
+.tabs{display:flex;gap:6px;background:var(--g);border:1px solid var(--b);border-radius:14px;padding:4px;max-width:360px;margin:0 auto 18px}
+.tabs button{flex:1;padding:10px;border:0;border-radius:10px;background:none;color:#cfc8ee;font-size:15px;transition:.25s}
+.tabs button.on{background:linear-gradient(135deg,#7c4dff,#2ea6ff);color:#fff;box-shadow:0 4px 16px #7c4dff66}
+section{display:none;max-width:360px;margin:0 auto;animation:in .4s ease}
+section.on{display:block}
+@keyframes in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.w{position:relative;width:fit-content;margin:8px auto 22px;filter:drop-shadow(0 10px 30px #7c4dff55)}
+#ptr{position:absolute;top:-6px;left:50%;margin-left:-13px;border:13px solid transparent;border-top:26px solid #ffd166;filter:drop-shadow(0 2px 4px #0008);transform-origin:50% 0;transition:transform .09s;z-index:2}
+.btn{display:block;width:100%;padding:15px;font-size:18px;font-weight:600;border:0;border-radius:14px;color:#fff;background:linear-gradient(135deg,#7c4dff,#2ea6ff);box-shadow:0 8px 24px #7c4dff66;transition:.2s}
+.btn:active{transform:scale(.97)}.btn:disabled{opacity:.5}
+#res{margin:16px 0 0;padding:16px;text-align:center;font-size:20px;font-weight:700;border-radius:16px;background:var(--g);border:1px solid var(--b);opacity:0;transform:translateY(14px);transition:.5s}
+#res.on{opacity:1;transform:none}
+.card{background:var(--g);border:1px solid var(--b);border-radius:18px;padding:18px;margin-bottom:14px;backdrop-filter:blur(8px)}
+.big{font-size:54px;font-weight:800;line-height:1;background:linear-gradient(135deg,#ffd166,#ff8fa3);-webkit-background-clip:text;background-clip:text;color:transparent}
+.lbl{font-size:13px;color:#b9b2dd;margin-bottom:6px}
+.bar{height:8px;border-radius:8px;background:#ffffff1f;margin-top:14px;overflow:hidden}
+#bar{height:100%;width:0;border-radius:8px;background:linear-gradient(90deg,#7c4dff,#2ea6ff);transition:width 1.2s cubic-bezier(.2,.8,.2,1)}
+.chips{display:flex;gap:8px;margin-bottom:14px}
+.chip{flex:1;text-align:center;padding:12px 4px;border-radius:14px;background:var(--g);border:1px solid var(--b)}
+.chip b{display:block;font-size:24px}.chip span{font-size:12px;color:#b9b2dd}
+.row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #ffffff14;font-size:14px}
+.row:last-child{border:0}.row i{width:9px;height:9px;border-radius:50%;flex:none}.row em{margin-left:auto;font-style:normal;color:#b9b2dd;font-size:12px}
+#cf{position:fixed;inset:0;pointer-events:none;z-index:9}
 </style></head><body>
-<div class="w"><canvas id="c"></canvas></div>
-<div id="r"></div>
-<button id="b">Крутить</button>
+<div class="tabs"><button id="t1">🎡 Колесо</button><button id="t2">📊 Кабинет</button></div>
+
+<section id="s1">
+  <div class="w"><div id="ptr"></div><canvas id="c"></canvas></div>
+  <button class="btn" id="go">Крутить</button>
+  <div id="res"></div>
+</section>
+
+<section id="s2">
+  <div class="card"><div class="lbl">Ваш баланс</div><div class="big" id="bal">0</div>
+    <div class="bar"><div id="bar"></div></div><div class="lbl" id="need" style="margin:8px 0 0"></div></div>
+  <div class="chips">
+    <div class="chip"><b id="a">0</b><span>Подтверждено</span></div>
+    <div class="chip"><b id="p">0</b><span>На проверке</span></div>
+    <div class="chip"><b id="r">0</b><span>Отклонено</span></div>
+  </div>
+  <div class="card"><div class="lbl">Последние приглашения</div><div id="h"></div></div>
+</section>
+<canvas id="cf"></canvas>
+
 <script>
 const tg=window.Telegram&&Telegram.WebApp;if(tg){tg.ready();tg.expand()}
-const q=new URLSearchParams(location.search);
-const L=(q.get("labels")||"Приз 1|Приз 2|Приз 3|Приз 4").split("|");
-const win=Math.min(Math.max(+q.get("win")||0,0),L.length-1);
-const res=q.get("res")||L[win],id="spin_"+(q.get("id")||"test");
-const n=L.length,TAU=2*Math.PI,seg=TAU/n;
-const cv=document.getElementById("c"),S=Math.min(innerWidth-32,340),d=devicePixelRatio||1;
+const $=i=>document.getElementById(i),q=new URLSearchParams(location.search),TAU=Math.PI*2;
+let snap={};try{snap=JSON.parse(q.get("s")||"{}")}catch(e){}
+const hasWheel=q.has("win");
+function tab(n){[1,2].forEach(i=>{$("s"+i).classList.toggle("on",i==n);$("t"+i).classList.toggle("on",i==n)})}
+$("t1").onclick=()=>tab(1);$("t2").onclick=()=>tab(2);
+if(!hasWheel){$("t1").style.display="none"}
+tab(hasWheel?1:2);
+
+/* ---------- кабинет ---------- */
+function countUp(el,to){const t0=performance.now();(function f(t){const p=Math.min((t-t0)/900,1);el.textContent=Math.round(to*(1-Math.pow(1-p,3)));if(p<1)requestAnimationFrame(f)})(t0)}
+const b=snap.b||0,c=snap.c||10;
+countUp($("bal"),b);setTimeout(()=>$("bar").style.width=Math.min(100,b/c*100)+"%",100);
+$("need").textContent=b>=c?"Хватает на крутку колеса 🎉":"До следующей крутки не хватает: "+(c-b);
+$("a").textContent=snap.a||0;$("p").textContent=snap.p||0;$("r").textContent=snap.r||0;
+const ST={approved:["#4ade80","Подтверждена"],pending:["#facc15","На проверке"],rejected:["#f87171","Отклонена"]};
+const hs=snap.h||[];
+if(!hs.length){$("h").textContent="Пока пусто";$("h").style.color="#b9b2dd"}
+hs.forEach(([d,n,s])=>{const r=document.createElement("div");r.className="row";
+  const i=document.createElement("i");i.style.background=(ST[s]||ST.pending)[0];
+  const t=document.createElement("span");t.textContent=n;
+  const e=document.createElement("em");e.textContent=(ST[s]||ST.pending)[1]+" · "+d.slice(5);
+  r.append(i,t,e);$("h").append(r)});
+
+/* ---------- колесо ---------- */
+const L=(q.get("labels")||"Приз 1|Приз 2|Приз 3|Приз 4").split("|"),n=L.length,seg=TAU/n;
+const win=Math.min(Math.max(+q.get("win")||0,0),n-1),res=q.get("res")||L[win],good=q.get("good")==="1";
+const key="spin_"+(q.get("id")||"test");
+const cv=$("c"),S=Math.min(innerWidth-32,340),d=devicePixelRatio||1;
 cv.width=cv.height=S*d;cv.style.width=cv.style.height=S+"px";
 const x=cv.getContext("2d");x.scale(d,d);
-const COL=["#e76f51","#f4a261","#2a9d8f","#457b9d","#8e6bbf","#e9c46a"];
-let rot=0;
+const PAL=[["#ff6b6b","#c92a5b"],["#ffb84d","#f76707"],["#3ddc97","#0b8f6a"],["#4dabf7","#2459c4"],["#b388ff","#6a3fd1"],["#ffe066","#e0a800"]];
+let rot=0,lit=0;
 function draw(){
-  const R=S/2;x.clearRect(0,0,S,S);
+  const R=S/2,r=R-16;x.clearRect(0,0,S,S);
+  x.beginPath();x.arc(R,R,R-2,0,TAU);x.fillStyle="#241a52";x.fill();
+  for(let i=0;i<24;i++){const a=i/24*TAU,on=(i+lit)%2==0;
+    x.beginPath();x.arc(R+Math.cos(a)*(R-8),R+Math.sin(a)*(R-8),3,0,TAU);
+    x.shadowColor="#ffd166";x.shadowBlur=on?10:0;x.fillStyle=on?"#ffd166":"#6b5d2e";x.fill()}
+  x.shadowBlur=0;
   for(let i=0;i<n;i++){
-    const a=rot+i*seg;
-    x.beginPath();x.moveTo(R,R);x.arc(R,R,R-4,a,a+seg);x.fillStyle=COL[i%COL.length];x.fill();
-    x.save();x.translate(R,R);x.rotate(a+seg/2);x.fillStyle="#fff";x.textAlign="right";
-    let f=16;do{x.font="bold "+f+"px sans-serif";f--}while(x.measureText(L[i]).width>R*.62&&f>9);
-    x.fillText(L[i],R-16,5);x.restore();
+    const a=rot+i*seg,m=a+seg/2,[c1,c2]=PAL[i%PAL.length];
+    const g=x.createLinearGradient(R,R,R+Math.cos(m)*r,R+Math.sin(m)*r);g.addColorStop(0,c2);g.addColorStop(1,c1);
+    x.beginPath();x.moveTo(R,R);x.arc(R,R,r,a,a+seg);x.closePath();x.fillStyle=g;x.fill();
+    x.strokeStyle="#ffffff55";x.lineWidth=1.5;x.stroke();
+    x.save();x.translate(R,R);x.rotate(m);x.textAlign="right";x.fillStyle="#fff";x.shadowColor="#0006";x.shadowBlur=4;
+    let f=17;do{x.font="700 "+f+"px system-ui,sans-serif";f--}while(x.measureText(L[i]).width>r*.62&&f>9);
+    x.fillText(L[i],r-14,5);x.restore();
   }
-  x.beginPath();x.arc(R,R,18,0,TAU);x.fillStyle="#fff";x.fill();
+  const h=x.createRadialGradient(R-4,R-4,2,R,R,22);h.addColorStop(0,"#fff3b0");h.addColorStop(1,"#e0a800");
+  x.beginPath();x.arc(R,R,22,0,TAU);x.fillStyle=h;x.shadowColor="#0008";x.shadowBlur=10;x.fill();x.shadowBlur=0;
 }
-const b=document.getElementById("b"),r=document.getElementById("r");
-function done(){
-  r.textContent="Вы выиграли: "+res;b.textContent="Закрыть";b.disabled=false;
-  b.onclick=()=>tg?tg.close():window.close();
-  try{localStorage.setItem(id,"1")}catch(e){}
-  if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred("success");
+const COLS=["#ffd166","#ff6b6b","#4dabf7","#3ddc97","#b388ff"];
+function confetti(){
+  const k=$("cf"),g=k.getContext("2d");k.width=innerWidth;k.height=innerHeight;
+  const P=Array.from({length:110},()=>({x:innerWidth/2,y:innerHeight*.45,vx:(Math.random()-.5)*14,vy:-Math.random()*13-4,s:5+Math.random()*5,c:COLS[Math.random()*5|0],r:Math.random()*6}));
+  let t=0;(function f(){g.clearRect(0,0,k.width,k.height);
+    P.forEach(p=>{p.vy+=.35;p.x+=p.vx;p.y+=p.vy;p.r+=.25;g.fillStyle=p.c;g.save();g.translate(p.x,p.y);g.rotate(p.r);g.fillRect(-p.s/2,-p.s/2,p.s,p.s*.6);g.restore()});
+    ++t<160?requestAnimationFrame(f):g.clearRect(0,0,k.width,k.height)})();
+}
+function finish(){
+  $("res").textContent=(good?"🎉 ":"")+"Вы выиграли: "+res;$("res").classList.add("on");
+  $("go").textContent="Закрыть";$("go").disabled=false;$("go").onclick=()=>tg?tg.close():window.close();
+  try{localStorage.setItem(key,"1")}catch(e){}
+  if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred(good?"success":"warning");
+  if(good)confetti();
 }
 function spin(){
-  b.disabled=true;
+  $("go").disabled=true;
   const c=(win+.5+(Math.random()-.5)*.7)*seg;
   const base=(((-Math.PI/2-c-rot)%TAU)+TAU)%TAU;
-  const from=rot,to=rot+6*TAU+base,t0=performance.now(),T=5000;
+  const from=rot,to=rot+7*TAU+base,t0=performance.now(),T=6000;let last=-1;
   (function f(t){
-    const p=Math.min((t-t0)/T,1);
-    rot=from+(to-from)*(1-Math.pow(1-p,4));draw();
-    p<1?requestAnimationFrame(f):done();
+    const p=Math.min((t-t0)/T,1);rot=from+(to-from)*(1-Math.pow(1-p,4));lit=Math.floor((t-t0)/120);draw();
+    const idx=Math.floor((((-Math.PI/2-rot)%TAU)+TAU)%TAU/seg);
+    if(idx!==last){if(last>=0){$("ptr").style.transform="rotate(-16deg)";setTimeout(()=>$("ptr").style.transform="",80);
+      if(tg&&tg.HapticFeedback)tg.HapticFeedback.selectionChanged()}last=idx}
+    p<1?requestAnimationFrame(f):finish();
   })(t0);
 }
-draw();
-let seen=false;try{seen=localStorage.getItem(id)}catch(e){}
-if(seen)done();else b.onclick=spin;
+if(hasWheel){
+  draw();let seen=false;try{seen=localStorage.getItem(key)}catch(e){}
+  if(seen)finish();else $("go").onclick=spin;
+}
 </script></body></html>
