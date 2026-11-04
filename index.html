@@ -30,8 +30,25 @@ section.on{display:block}
 .row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #ffffff14;font-size:14px}
 .row:last-child{border:0}.row i{width:9px;height:9px;border-radius:50%;flex:none}.row em{margin-left:auto;font-style:normal;color:#b9b2dd;font-size:12px}
 #cf{position:fixed;inset:0;pointer-events:none;z-index:9}
+body:before,body:after{content:"";position:fixed;z-index:-1;width:60vmax;height:60vmax;border-radius:50%;filter:blur(80px);opacity:.35;animation:fl 14s ease-in-out infinite alternate}
+body:before{background:#7c4dff;top:-20vmax;left:-20vmax}
+body:after{background:#0ea5e9;bottom:-25vmax;right:-20vmax;animation-delay:-7s}
+@keyframes fl{to{transform:translate(8vmax,6vmax) scale(1.15)}}
+.w{animation:glow 3s ease-in-out infinite alternate}
+@keyframes glow{from{filter:drop-shadow(0 10px 26px #7c4dff44)}to{filter:drop-shadow(0 12px 44px #2ea6ffaa)}}
+.btn{position:relative;overflow:hidden}
+.btn:not(:disabled):after{content:"";position:absolute;top:0;left:-60%;width:40%;height:100%;background:linear-gradient(100deg,transparent,#fff5,transparent);transform:skewX(-20deg);animation:shine 3.2s infinite}
+@keyframes shine{to{left:130%}}
+.card,.chip{box-shadow:0 8px 30px #0004}
+#res.on{background:linear-gradient(135deg,#7c4dff33,#2ea6ff33);border-color:#7c4dff88}
+.pr{padding:12px 0;border-bottom:1px solid #ffffff14}.pr:last-child{border:0}
+.pr .t{display:flex;justify-content:space-between;align-items:center;font-size:14px;gap:8px}
+.pr input[type=range]{width:100%;margin:8px 0 0;accent-color:#7c4dff}
+.pr.off{opacity:.45}
+.sw{font-size:12px;color:#cfc8ee;background:none;border:1px solid var(--b);border-radius:8px;padding:3px 8px}
+.kv{display:flex;justify-content:space-between;font-size:14px;padding:6px 0}
 </style></head><body>
-<div class="tabs"><button id="t1">🎡 Колесо</button><button id="t2">📊 Кабинет</button></div>
+<div class="tabs"><button id="t1">🎡 Колесо</button><button id="t2">📊 Кабинет</button><button id="t3" style="display:none">⚙️ Админ</button></div>
 
 <section id="s1">
   <div class="w"><div id="ptr"></div><canvas id="c"></canvas></div>
@@ -49,17 +66,23 @@ section.on{display:block}
   </div>
   <div class="card"><div class="lbl">Последние приглашения</div><div id="h"></div></div>
 </section>
+<section id="s3">
+  <div class="card"><div class="lbl">Итоги колеса</div><div id="tot"></div></div>
+  <div class="card"><div class="lbl">Шансы призов: двигайте ползунки</div><div id="pl"></div><div class="lbl" id="sum" style="margin-top:10px"></div></div>
+  <button class="btn" id="save">💾 Сохранить шансы</button>
+  <div class="card" style="margin-top:14px"><div class="lbl">Топ игроков по тратам</div><div id="top"></div></div>
+</section>
 <canvas id="cf"></canvas>
 
 <script>
 const tg=window.Telegram&&Telegram.WebApp;if(tg){tg.ready();tg.expand()}
 const $=i=>document.getElementById(i),q=new URLSearchParams(location.search),TAU=Math.PI*2;
 let snap={};try{snap=JSON.parse(q.get("s")||"{}")}catch(e){}
-const hasWheel=q.has("win");
-function tab(n){[1,2].forEach(i=>{$("s"+i).classList.toggle("on",i==n);$("t"+i).classList.toggle("on",i==n)})}
-$("t1").onclick=()=>tab(1);$("t2").onclick=()=>tab(2);
+const hasWheel=q.has("win"),isAdmin=q.has("admin");
+function tab(n){[1,2,3].forEach(i=>{$("s"+i).classList.toggle("on",i==n);$("t"+i).classList.toggle("on",i==n)})}
+$("t1").onclick=()=>tab(1);$("t2").onclick=()=>tab(2);$("t3").onclick=()=>tab(3);
 if(!hasWheel){$("t1").style.display="none"}
-tab(hasWheel?1:2);
+tab(isAdmin?3:hasWheel?1:2);
 
 /* ---------- кабинет ---------- */
 function countUp(el,to){const t0=performance.now();(function f(t){const p=Math.min((t-t0)/900,1);el.textContent=Math.round(to*(1-Math.pow(1-p,3)));if(p<1)requestAnimationFrame(f)})(t0)}
@@ -101,6 +124,8 @@ function draw(){
     let f=17;do{x.font="700 "+f+"px system-ui,sans-serif";f--}while(x.measureText(L[i]).width>r*.62&&f>9);
     x.fillText(L[i],r-14,5);x.restore();
   }
+  const gl=x.createRadialGradient(R*.7,R*.55,5,R,R,r);gl.addColorStop(0,"#ffffff48");gl.addColorStop(.55,"#ffffff00");
+  x.beginPath();x.arc(R,R,r,0,TAU);x.fillStyle=gl;x.fill();
   const h=x.createRadialGradient(R-4,R-4,2,R,R,22);h.addColorStop(0,"#fff3b0");h.addColorStop(1,"#e0a800");
   x.beginPath();x.arc(R,R,22,0,TAU);x.fillStyle=h;x.shadowColor="#0008";x.shadowBlur=10;x.fill();x.shadowBlur=0;
 }
@@ -135,5 +160,27 @@ function spin(){
 if(hasWheel){
   draw();let seen=false;try{seen=localStorage.getItem(key)}catch(e){}
   if(seen)finish();else $("go").onclick=spin;
+}
+if(isAdmin){
+  $("t3").style.display="";$("t1").style.display="none";$("t2").style.display="none";
+  let A={};try{A=JSON.parse(q.get("a")||"{}")}catch(e){}
+  const P=(A.p||[]).map(p=>({id:p[0],name:p[1],w:p[2],on:!!p[3]})),T=A.t||{};
+  const kv=(k,v)=>{const r=document.createElement("div");r.className="kv";const a=document.createElement("span"),b=document.createElement("b");a.textContent=k;b.textContent=v;r.append(a,b);return r};
+  [["Круток",T.n||0],["Потрачено бонусов",T.sp||0],["Выплачено бонусами",T.bw||0],["Призов выдаёт менеджер",T.it||0]].forEach(([k,v])=>$("tot").append(kv(k,v)));
+  const upd=()=>{const s=P.filter(p=>p.on&&p.w>0).reduce((a,p)=>a+p.w,0)||1;
+    P.forEach(p=>p.pct.textContent=p.on&&p.w>0?(p.w/s*100).toFixed(1)+"%":"выкл");
+    $("sum").textContent="Сумма весов: "+s+" · шанс = вес / сумма"};
+  P.forEach(p=>{const r=document.createElement("div");r.className="pr"+(p.on?"":" off");
+    const t=document.createElement("div");t.className="t",n=document.createElement("span");n.textContent=p.name;
+    p.pct=document.createElement("b");const sw=document.createElement("button");sw.className="sw";sw.textContent=p.on?"вкл":"выкл";
+    const wt=document.createElement("div");wt.className="lbl";wt.textContent="вес "+p.w;
+    const rg=document.createElement("input");rg.type="range";rg.min=0;rg.max=Math.max(100,p.w);rg.value=p.w;
+    rg.oninput=()=>{p.w=+rg.value;wt.textContent="вес "+p.w;upd()};
+    sw.onclick=()=>{p.on=!p.on;sw.textContent=p.on?"вкл":"выкл";r.classList.toggle("off",!p.on);upd()};
+    t.append(n,p.pct,sw);r.append(t,wt,rg);$("pl").append(r)});
+  upd();
+  (A.top||[]).forEach(([n,c,sp,bw,it])=>{const r=document.createElement("div");r.className="row";const a=document.createElement("span");a.textContent=n;const e=document.createElement("em");e.textContent=c+" круток · −"+sp+" · +"+bw+(it?" · призов "+it:"");r.append(a,e);$("top").append(r)});
+  if(!(A.top||[]).length){$("top").textContent="Пока нет круток";$("top").style.color="#b9b2dd"}
+  $("save").onclick=()=>{const d=JSON.stringify({a:"odds",p:P.map(p=>[p.id,p.w,p.on?1:0])});if(tg)tg.sendData(d);else alert(d)};
 }
 </script></body></html>
