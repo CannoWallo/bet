@@ -47,6 +47,10 @@ body:after{background:#0ea5e9;bottom:-25vmax;right:-20vmax;animation-delay:-7s}
 .pr.off{opacity:.45}
 .sw{font-size:12px;color:#cfc8ee;background:none;border:1px solid var(--b);border-radius:8px;padding:3px 8px}
 .kv{display:flex;justify-content:space-between;font-size:14px;padding:6px 0}
+.in{width:100%;padding:9px 11px;margin:0 0 6px;background:#ffffff14;border:1px solid var(--b);border-radius:10px;color:#fff;font-size:14px;font-family:inherit}
+.in.xs{width:76px;margin:0}
+.pr label.lbl{margin:0;display:flex;align-items:center;gap:4px}
+.pr .t .in{flex:1}
 </style></head><body>
 <div class="tabs"><button id="t1">🎡 Колесо</button><button id="t2">📊 Кабинет</button><button id="t3" style="display:none">⚙️ Админ</button></div>
 
@@ -68,8 +72,8 @@ body:after{background:#0ea5e9;bottom:-25vmax;right:-20vmax;animation-delay:-7s}
 </section>
 <section id="s3">
   <div class="card"><div class="lbl">Итоги колеса</div><div id="tot"></div></div>
-  <div class="card"><div class="lbl">Шансы призов: двигайте ползунки</div><div id="pl"></div><div class="lbl" id="sum" style="margin-top:10px"></div></div>
-  <button class="btn" id="save">💾 Сохранить шансы</button>
+  <div class="card"><div class="lbl">Призы колеса: шанс в процентах</div><div id="pl"></div><div class="lbl" id="sum" style="margin-top:10px"></div><div style="display:flex;gap:8px;margin-top:10px"><button class="sw" id="add">+ Добавить приз</button><button class="sw" id="norm">Выровнять до 100%</button></div></div>
+  <button class="btn" id="save">💾 Сохранить призы</button>
   <div class="card" style="margin-top:14px"><div class="lbl">Топ игроков по тратам</div><div id="top"></div></div>
 </section>
 <canvas id="cf"></canvas>
@@ -164,23 +168,38 @@ if(hasWheel){
 if(isAdmin){
   $("t3").style.display="";$("t1").style.display="none";$("t2").style.display="none";
   let A={};try{A=JSON.parse(q.get("a")||"{}")}catch(e){}
-  const P=(A.p||[]).map(p=>({id:p[0],name:p[1],w:p[2],on:!!p[3]})),T=A.t||{};
-  const kv=(k,v)=>{const r=document.createElement("div");r.className="kv";const a=document.createElement("span"),b=document.createElement("b");a.textContent=k;b.textContent=v;r.append(a,b);return r};
+  const T=A.t||{};
+  const P=(A.p||[]).map(p=>({id:p[0],name:p[1],short:p[2],w:p[3],b:p[4],f:!!p[5],pct:0}));
+  const tw=P.reduce((a,p)=>a+p.w,0)||1;P.forEach(p=>p.pct=+(p.w/tw*100).toFixed(1));
+  const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
+  const kv=(k,v)=>{const r=el("div","kv"),b=el("b","",v);r.append(el("span","",k),b);return r};
   [["Круток",T.n||0],["Потрачено бонусов",T.sp||0],["Выплачено бонусами",T.bw||0],["Призов выдаёт менеджер",T.it||0]].forEach(([k,v])=>$("tot").append(kv(k,v)));
-  const upd=()=>{const s=P.filter(p=>p.on&&p.w>0).reduce((a,p)=>a+p.w,0)||1;
-    P.forEach(p=>p.pct.textContent=p.on&&p.w>0?(p.w/s*100).toFixed(1)+"%":"выкл");
-    $("sum").textContent="Сумма весов: "+s+" · шанс = вес / сумма"};
-  P.forEach(p=>{const r=document.createElement("div");r.className="pr"+(p.on?"":" off");
-    const t=document.createElement("div");t.className="t",n=document.createElement("span");n.textContent=p.name;
-    p.pct=document.createElement("b");const sw=document.createElement("button");sw.className="sw";sw.textContent=p.on?"вкл":"выкл";
-    const wt=document.createElement("div");wt.className="lbl";wt.textContent="вес "+p.w;
-    const rg=document.createElement("input");rg.type="range";rg.min=0;rg.max=Math.max(100,p.w);rg.value=p.w;
-    rg.oninput=()=>{p.w=+rg.value;wt.textContent="вес "+p.w;upd()};
-    sw.onclick=()=>{p.on=!p.on;sw.textContent=p.on?"вкл":"выкл";r.classList.toggle("off",!p.on);upd()};
-    t.append(n,p.pct,sw);r.append(t,wt,rg);$("pl").append(r)});
-  upd();
-  (A.top||[]).forEach(([n,c,sp,bw,it])=>{const r=document.createElement("div");r.className="row";const a=document.createElement("span");a.textContent=n;const e=document.createElement("em");e.textContent=c+" круток · −"+sp+" · +"+bw+(it?" · призов "+it:"");r.append(a,e);$("top").append(r)});
+  const sum=()=>P.reduce((a,p)=>a+(+p.pct||0),0);
+  function upd(){const s=sum();$("sum").textContent="Сумма: "+s.toFixed(1)+"% · призов: "+P.length+" (от 2 до 12)";$("sum").style.color=Math.abs(s-100)<.06?"#4ade80":"#facc15"}
+  function inp(ph,val,on,cls){const i=el("input","in"+(cls?" "+cls:""));i.placeholder=ph;i.value=val;i.oninput=()=>on(i.value);return i}
+  function render(){
+    $("pl").textContent="";
+    P.forEach((p,k)=>{
+      const r=el("div","pr"),h1=el("div","t");
+      const del=el("button","sw","✕");del.onclick=()=>{if(P.length<=2)return;P.splice(k,1);render()};
+      h1.append(inp("Название приза",p.name,v=>p.name=v),del);
+      const sh=inp("Подпись на колесе (коротко)",p.short,v=>p.short=v);
+      const pc=el("div","t"),pv=el("b","",p.pct+"%");pc.append(el("span","lbl","Шанс выпадения"),pv);
+      const rg=el("input");rg.type="range";rg.min=0;rg.max=100;rg.step=.5;rg.value=p.pct;
+      rg.oninput=()=>{p.pct=+rg.value;pv.textContent=p.pct+"%";upd()};
+      const ex=el("div","t"),bo=inp("0",p.b,v=>p.b=Math.max(0,+v||0),"xs");bo.type="number";
+      const lb=el("label","lbl"),cb=el("input");cb.type="checkbox";cb.checked=p.f;cb.onchange=()=>p.f=cb.checked;lb.append(cb," выдаёт менеджер");
+      ex.append(el("span","lbl","+ бонусов"),bo,lb);
+      r.append(h1,sh,pc,rg,ex);$("pl").append(r)});
+    upd();
+  }
+  $("add").onclick=()=>{if(P.length>=12)return;P.push({id:0,name:"Новый приз",short:"🎁 Приз",w:0,b:0,f:true,pct:0});render()};
+  $("norm").onclick=()=>{const s=sum();P.forEach(p=>p.pct=s>0?+(p.pct/s*100).toFixed(1):+(100/P.length).toFixed(1));render()};
+  render();
+  (A.top||[]).forEach(([n,c,sp,bw,it])=>{const r=el("div","row"),e=el("em","",c+" круток · −"+sp+" · +"+bw+(it?" · призов "+it:""));r.append(el("span","",n),e);$("top").append(r)});
   if(!(A.top||[]).length){$("top").textContent="Пока нет круток";$("top").style.color="#b9b2dd"}
-  $("save").onclick=()=>{const d=JSON.stringify({a:"odds",p:P.map(p=>[p.id,p.w,p.on?1:0])});if(tg)tg.sendData(d);else alert(d)};
+  $("save").onclick=()=>{const s=sum();if(s<=0){alert("Задайте шанс хотя бы одному призу");return}
+    const d=JSON.stringify({a:"prizes",p:P.map(p=>[p.id,(p.name||"").trim()||"Приз",(p.short||"").trim()||"Приз",Math.round(p.pct/s*1000),p.b,p.f?1:0])});
+    if(tg)tg.sendData(d);else alert(d)};
 }
 </script></body></html>
