@@ -69,6 +69,7 @@ body:after{background:#0ea5e9;bottom:-25vmax;right:-20vmax;animation-delay:-7s}
     <div class="chip"><b id="r">0</b><span>Отклонено</span></div>
   </div>
   <div class="card"><div class="lbl">Последние приглашения</div><div id="h"></div></div>
+  <div class="card"><div class="lbl">Мои выигрыши</div><div id="wins"></div></div>
 </section>
 <section id="s3">
   <div class="card"><div class="lbl">Итоги колеса</div><div id="tot"></div></div>
@@ -82,11 +83,12 @@ body:after{background:#0ea5e9;bottom:-25vmax;right:-20vmax;animation-delay:-7s}
 const tg=window.Telegram&&Telegram.WebApp;if(tg){tg.ready();tg.expand()}
 const $=i=>document.getElementById(i),q=new URLSearchParams(location.search),TAU=Math.PI*2;
 let snap={};try{snap=JSON.parse(q.get("s")||"{}")}catch(e){}
-const hasWheel=q.has("win"),isAdmin=q.has("admin");
+const live=q.has("api"),hasWheel=q.has("win")||live,isAdmin=q.has("admin");
+let liveDone=null;
 function tab(n){[1,2,3].forEach(i=>{$("s"+i).classList.toggle("on",i==n);$("t"+i).classList.toggle("on",i==n)})}
 $("t1").onclick=()=>tab(1);$("t2").onclick=()=>tab(2);$("t3").onclick=()=>tab(3);
 if(!hasWheel){$("t1").style.display="none"}
-tab(isAdmin?3:hasWheel?1:2);
+tab(isAdmin?3:live?(q.get("tab")==="cab"?2:1):hasWheel?1:2);
 
 /* ---------- кабинет ---------- */
 function countUp(el,to){const t0=performance.now();(function f(t){const p=Math.min((t-t0)/900,1);el.textContent=Math.round(to*(1-Math.pow(1-p,3)));if(p<1)requestAnimationFrame(f)})(t0)}
@@ -104,8 +106,8 @@ hs.forEach(([d,n,s])=>{const r=document.createElement("div");r.className="row";
   r.append(i,t,e);$("h").append(r)});
 
 /* ---------- колесо ---------- */
-const L=(q.get("labels")||"Приз 1|Приз 2|Приз 3|Приз 4").split("|"),n=L.length,seg=TAU/n;
-const win=Math.min(Math.max(+q.get("win")||0,0),n-1),res=q.get("res")||L[win],good=q.get("good")==="1";
+let L=(q.get("labels")||"Приз 1|Приз 2|Приз 3|Приз 4").split("|"),n=L.length,seg=TAU/n;
+let win=Math.min(Math.max(+q.get("win")||0,0),n-1),res=q.get("res")||L[win],good=q.get("good")==="1";
 const key="spin_"+(q.get("id")||"test");
 const cv=$("c"),S=Math.min(innerWidth-32,340),d=devicePixelRatio||1;
 cv.width=cv.height=S*d;cv.style.width=cv.style.height=S+"px";
@@ -142,6 +144,7 @@ function confetti(){
     ++t<160?requestAnimationFrame(f):g.clearRect(0,0,k.width,k.height)})();
 }
 function finish(){
+  if(live&&liveDone){liveDone();return}
   $("res").textContent=(good?"🎉 ":"")+"Вы выиграли: "+res;$("res").classList.add("on");
   $("go").textContent="Закрыть";$("go").disabled=false;$("go").onclick=()=>tg?tg.close():window.close();
   try{localStorage.setItem(key,"1")}catch(e){}
@@ -161,9 +164,47 @@ function spin(){
     p<1?requestAnimationFrame(f):finish();
   })(t0);
 }
-if(hasWheel){
+if(hasWheel&&!live){
   draw();let seen=false;try{seen=localStorage.getItem(key)}catch(e){}
   if(seen)finish();else $("go").onclick=spin;
+}
+if(live){
+  const API=q.get("api"),AUTH="tma "+(tg?tg.initData:"");
+  const call=p=>fetch(API+"/api/"+p,{method:"POST",headers:{Authorization:AUTH}}).then(r=>r.json());
+  const row=(t,m,c)=>{const r=document.createElement("div");r.className="row";const i=document.createElement("i");i.style.background=c;const s=document.createElement("span");s.textContent=t;const e=document.createElement("em");e.textContent=m;r.append(i,s,e);return r};
+  const fill=(box,arr,mk,empty)=>{box.textContent="";if(!arr.length){box.textContent=empty;box.style.color="#b9b2dd";return}box.style.color="";arr.forEach(a=>box.append(mk(a)))};
+  let bal=0,cost=10;
+  function renderCab(s){
+    const b=s.b||0,c=s.c||10;
+    countUp($("bal"),b);$("bar").style.width=Math.min(100,b/c*100)+"%";
+    $("need").textContent=b>=c?"Хватает на крутку колеса 🎉":"До следующей крутки не хватает: "+(c-b);
+    $("a").textContent=s.a||0;$("p").textContent=s.p||0;$("r").textContent=s.r||0;
+    fill($("h"),s.h||[],([d,n,st])=>row(n,(ST[st]||ST.pending)[1]+" · "+d.slice(5),(ST[st]||ST.pending)[0]),"Пока пусто");
+    fill($("wins"),s.wins||[],([d,pz])=>row(pz,d.slice(5),"#7c4dff"),"Вы ещё не крутили колесо");
+  }
+  const setGo=()=>{$("go").disabled=false;$("go").textContent="Крутить · "+cost+" бонусов (у вас "+bal+")"};
+  const say=t=>{$("res").textContent=t;$("res").classList.add("on")};
+  async function load(){
+    let s;try{s=await call("me")}catch(e){say("Нет связи с сервером. Попробуйте позже.");return}
+    if(s.error){say("Откройте приложение из бота, чтобы войти.");return}
+    bal=s.b;cost=s.c;renderCab(s);
+    if(s.labels&&s.labels.length){L=s.labels;n=L.length;seg=TAU/n}
+    draw();setGo();
+  }
+  liveDone=async()=>{
+    say((good?"🎉 ":"")+"Вы выиграли: "+res);
+    if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred(good?"success":"warning");
+    if(good)confetti();
+    await load();
+  };
+  $("go").onclick=async()=>{
+    $("go").disabled=true;$("res").classList.remove("on");
+    let r;try{r=await call("spin")}catch(e){say("Нет связи с сервером.");setGo();return}
+    if(r.error){say(r.error==="balance"?"Не хватает бонусов":r.error==="sub"?"Подпишитесь на канал и откройте снова":r.error==="setup"?"Колесо пока не настроено":"Ошибка входа");await load();return}
+    L=r.labels;n=L.length;seg=TAU/n;win=r.win;res=r.res;good=!!r.good;bal=r.balance;
+    spin();
+  };
+  draw();load();
 }
 if(isAdmin){
   $("t3").style.display="";$("t1").style.display="none";$("t2").style.display="none";
